@@ -4,6 +4,8 @@
 // includes file not in repository with ssid and pwd
 #include "secDefine1.h"
 
+#include <RobotSharedDefines.h>
+
 #include "ESP8266WiFi.h"
 
 void setupWifi();
