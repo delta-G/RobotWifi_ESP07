@@ -23,6 +23,7 @@ WiFiClient client;
 
 char replyBuffer[50];
 
+
 void setupWiFi() {
 	Serial.println("Setting Up WiFi");
 
