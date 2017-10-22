@@ -25,27 +25,39 @@ char replyBuffer[50];
 
 
 void setupWiFi() {
-	Serial.println("Setting Up WiFi");
 
-	WiFi.mode(WIFI_STA);
 	IPAddress ipa(192, 168, 1, 75);
 //	IPAddress dns(192, 168, 1, 1);
 	IPAddress gate(192, 168, 1, 1);
 	IPAddress sub(255, 255, 255, 0);
 
-	WiFi.config(ipa, gate, sub);
-	WiFi.begin(ssid, pwd);
+	Serial.println("Setting Up WiFi");
 
-	heartbeatDelay = 100;
+//	WiFi.mode(WIFI_STA);
+//	WiFi.config(ipa, gate, sub);
+//	WiFi.begin(ssid, pwd);
+//
+//	heartbeatDelay = 100;
+//
+//	while (WiFi.status() != WL_CONNECTED) {
+//		delay(500);
+//		Serial.print(".");
+//		heartbeat();
+//	}
 
-	while (WiFi.status() != WL_CONNECTED) {
-		delay(500);
-		Serial.print(".");
-		heartbeat();
-	}
+	//  This section for AP Mode with static IP. (Untested!!!)
 
-//	WiFi.mode(WIFI_AP);
+
+//	WiFi.mode(WIFI_AP_STA);
+//	WiFi.softAPConfig(ipa, gate, sub);
 //	WiFi.softAP("RControl");
+
+
+
+
+	// This section is AP Mode with 192.168.4.1
+	WiFi.mode(WIFI_AP);
+	WiFi.softAP("RControl");
 //	Serial.println("");
 //	Serial.println(WiFi.localIP());
 
