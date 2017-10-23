@@ -26,12 +26,12 @@ char replyBuffer[50];
 
 void setupWiFi() {
 
-	IPAddress ipa(192, 168, 1, 75);
-//	IPAddress dns(192, 168, 1, 1);
-	IPAddress gate(192, 168, 1, 1);
-	IPAddress sub(255, 255, 255, 0);
+//	IPAddress ipa(192, 168, 1, 75);
+////	IPAddress dns(192, 168, 1, 1);
+//	IPAddress gate(192, 168, 1, 1);
+//	IPAddress sub(255, 255, 255, 0);
 
-	Serial.println("Setting Up WiFi");
+//	Serial.println("Setting Up WiFi");
 
 //	WiFi.mode(WIFI_STA);
 //	WiFi.config(ipa, gate, sub);
@@ -60,6 +60,8 @@ void setupWiFi() {
 	WiFi.softAP("RControl");
 //	Serial.println("");
 //	Serial.println(WiFi.localIP());
+
+	delay(500);
 
 }
 
