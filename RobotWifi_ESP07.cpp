@@ -139,7 +139,9 @@ void heartbeat() {
 		digitalWrite(heartbeatPin, heartState);
 		lastMil = curMil;
 		if (client.connected()) {
-				client.print("<ESP-HB>");
+				client.print("<ESP-HB ");
+				client.print(WiFi.RSSI());
+				client.print(">");
 			}
 	}
 }
