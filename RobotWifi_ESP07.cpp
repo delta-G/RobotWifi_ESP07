@@ -31,6 +31,13 @@ RobotWifi-ESP07  --  runs on ESP8266 and handles WiFi communications for my robo
 
 #include "RobotWifi_ESP07.h"
 
+
+#define USE_HOME_WIFI
+
+//#define USE_ESP_AS_HOTSPOT_STATIC
+//#define USE_ESP_AS_HOTSPOT
+
+
 const uint8_t heartbeatPin = 12;
 uint16_t heartbeatDelay = 2000;
 unsigned long lastMil = millis();
@@ -48,25 +55,29 @@ StreamParser clientParser(&client, START_OF_PACKET, END_OF_PACKET, handleClient)
 
 void setupWiFi() {
 
-//	IPAddress ipa(192, 168, 1, 75);
-////	IPAddress dns(192, 168, 1, 1);
-//	IPAddress gate(192, 168, 1, 1);
-//	IPAddress sub(255, 255, 255, 0);
+#ifdef USE_HOME_WIFI
 
-//	Serial.println("Setting Up WiFi");
+	IPAddress ipa(192, 168, 1, 75);
+	IPAddress gate(192, 168, 1, 1);
+	IPAddress sub(255, 255, 255, 0);
 
-//	WiFi.mode(WIFI_STA);
-//	WiFi.config(ipa, gate, sub);
-//	WiFi.begin(ssid, pwd);
-//
-//	heartbeatDelay = 100;
-//
-//	while (WiFi.status() != WL_CONNECTED) {
-//		delay(500);
-//		Serial.print(".");
-//		heartbeat();
-//	}
+	Serial.println("Setting Up WiFi");
 
+	WiFi.mode(WIFI_STA);
+	WiFi.config(ipa, gate, sub);
+	WiFi.begin(ssid, pwd);
+
+	heartbeatDelay = 100;
+
+	while (WiFi.status() != WL_CONNECTED) {
+		delay(500);
+		Serial.print(".");
+		heartbeat();
+	}
+
+#endif
+
+#ifdef USE_ESP_AS_HOTSPOT_STATIC
 	//  This section for AP Mode with static IP. (Untested!!!)
 
 
@@ -74,14 +85,16 @@ void setupWiFi() {
 //	WiFi.softAPConfig(ipa, gate, sub);
 //	WiFi.softAP("RControl");
 
+#endif
 
-
+#ifdef USE_ESP_AS_HOTSPOT
 
 	// This section is AP Mode with 192.168.4.1
 	WiFi.mode(WIFI_AP);
 	WiFi.softAP("RControl");
 //	Serial.println("");
 //	Serial.println(WiFi.localIP());
+#endif
 
 	delay(500);
 
@@ -144,7 +157,7 @@ void heartbeat() {
 		digitalWrite(heartbeatPin, heartState);
 		lastMil = curMil;
 		if (client.connected()) {
-				client.print("<ESP-HB ");
+				client.print("<E-HB");
 				client.print(WiFi.RSSI());
 				client.print(">");
 			}
