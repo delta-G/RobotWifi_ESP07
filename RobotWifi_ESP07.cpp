@@ -145,3 +145,16 @@ void heartbeat() {
 			}
 	}
 }
+
+
+void scanNetworks(){
+
+	int count = WiFi.scanNetworks();
+
+	for (int i = 0; i < count; i++){
+		char buf[100] = {0};
+		sprintf(buf, "<%d,%d>", WiFi.SSID(i), WiFi.RSSI(i));
+		client.print(buf);
+	}
+
+}
