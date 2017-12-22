@@ -1,3 +1,23 @@
+/*
+
+RobotWifi-ESP07  --  runs on ESP8266 and handles WiFi communications for my robot
+     Copyright (C) 2017  David C.
+
+     This program is free software: you can redistribute it and/or modify
+     it under the terms of the GNU General Public License as published by
+     the Free Software Foundation, either version 3 of the License, or
+     (at your option) any later version.
+
+     This program is distributed in the hope that it will be useful,
+     but WITHOUT ANY WARRANTY; without even the implied warranty of
+     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+     GNU General Public License for more details.
+
+     You should have received a copy of the GNU General Public License
+     along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+     */
+
 #include "RobotWifi_ESP07.h"
 
 /*
@@ -21,7 +41,8 @@ const char* pwd = MY_NETWORK_PASSWORD;
 WiFiServer server(1234);
 WiFiClient client;
 
-char replyBuffer[50];
+char serialReplyBuffer[100];
+char clientReplyBuffer[100];
 
 
 void setupWiFi() {
@@ -112,13 +133,13 @@ void loop() {
 		if (Serial.available()) {
 			static uint8_t index;
 			char c = Serial.read();
-			replyBuffer[index] = c;
-			replyBuffer[++index] = 0;
+			serialReplyBuffer[index] = c;
+			serialReplyBuffer[++index] = 0;
 
 			if (c == '>' || index == 40){
-				client.print(replyBuffer);
+				client.print(serialReplyBuffer);
 				index = 0;
-				replyBuffer[index] = 0;
+				serialReplyBuffer[index] = 0;
 
 			}
 //			client.print((char) Serial.read());
