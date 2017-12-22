@@ -17,9 +17,6 @@ RobotWifi-ESP07  --  runs on ESP8266 and handles WiFi communications for my robo
      along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
      */
-
-#include "RobotWifi_ESP07.h"
-
 /*
  *
  * Written for ESP-07 board.
@@ -31,6 +28,9 @@ RobotWifi-ESP07  --  runs on ESP8266 and handles WiFi communications for my robo
  *
  */
 
+
+#include "RobotWifi_ESP07.h"
+
 const uint8_t heartbeatPin = 12;
 uint16_t heartbeatDelay = 2000;
 unsigned long lastMil = millis();
@@ -41,8 +41,9 @@ const char* pwd = MY_NETWORK_PASSWORD;
 WiFiServer server(1234);
 WiFiClient client;
 
-char serialReplyBuffer[100];
-char clientReplyBuffer[100];
+StreamParser serialParser(&Serial, START_OF_PACKET, END_OF_PACKET, handleSerial);
+StreamParser clientParser(&client, START_OF_PACKET, END_OF_PACKET, handleClient);
+
 
 
 void setupWiFi() {
@@ -125,28 +126,11 @@ void loop() {
 		client = server.available();
 		heartbeatDelay = 200;
 	} else {
-		if (client.available() > 0) {
-
-			Serial.print((char) client.read());
-
-		}
-		if (Serial.available()) {
-			static uint8_t index;
-			char c = Serial.read();
-			serialReplyBuffer[index] = c;
-			serialReplyBuffer[++index] = 0;
-
-			if (c == '>' || index == 40){
-				client.print(serialReplyBuffer);
-				index = 0;
-				serialReplyBuffer[index] = 0;
-
-			}
-//			client.print((char) Serial.read());
-		}
 		heartbeatDelay = 2000;
-	}
 
+		serialParser.run();
+		clientParser.run();
+	}
 }
 
 void heartbeat() {
@@ -179,3 +163,38 @@ void scanNetworks(){
 	}
 
 }
+
+
+void handleClient(char* aBuf){
+
+	if(aBuf[1] == 'E'){
+		switch(aBuf[2]){
+		case 'W':
+			scanNetworks();
+			break;
+		default:
+			client.print("<Bad Command>");
+		}
+	}
+	else {
+		Serial.print(aBuf);
+	}
+
+}
+
+void handleSerial(char* aBuf) {
+	if (aBuf[1] == 'E') {
+		switch (aBuf[2]) {
+		case 'H':
+			Serial.print("<^_^>");
+			break;
+		default:
+			break;
+		}
+	} else {
+		client.print(aBuf);
+	}
+}
+
+
+

@@ -18,28 +18,35 @@ RobotWifi-ESP07  --  runs on ESP8266 and handles WiFi communications for my robo
 
      */
 
-#ifndef _RobotWifi_ESP07_H_
-#define _RobotWifi_ESP07_H_
+#ifndef STREAMPARSER_H_
+#define STREAMPARSER_H_
+
 #include "Arduino.h"
-// includes file not in repository with ssid and pwd
-#include "secDefine1.h"
-
-#include <RobotSharedDefines.h>
-
 #include "ESP8266WiFi.h"
 
-#include "StreamParser.h"
+#define BUFFER_SIZE 100
 
 
-void setupWifi();
-void setup();
-void loop();
-void heartbeat();
 
-void scanNetworks();
+class StreamParser {
 
-void handleClient(char*);
-void handleSerial(char*);
+private:
+	char buffer[BUFFER_SIZE];
+	int index;
+
+	Stream* in;
+	char sop;
+	char eop;
+
+	void (*callback)(char*);
+
+	boolean receiving;
+
+	StreamParser(Stream* aIn, char aSop, char aEop, void(*aCallback)(char*)):in(aIn), sop(aSop), eop(aEop), callback(aCallback), receiving(false), index(0){};
+	void run();
+
+};
 
 
-#endif /* _RobotWifi_ESP07_H_ */
+
+#endif /* STREAMPARSER_H_ */
