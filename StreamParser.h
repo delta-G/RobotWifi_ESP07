@@ -42,7 +42,10 @@ private:
 
 	boolean receiving;
 
-	StreamParser(Stream* aIn, char aSop, char aEop, void(*aCallback)(char*)):in(aIn), sop(aSop), eop(aEop), callback(aCallback), receiving(false), index(0){};
+
+public:
+
+	StreamParser(Stream* aIn, char aSop, char aEop, void(*aCallback)(char*)):index(0), in(aIn), sop(aSop), eop(aEop), callback(aCallback), receiving(false){};
 	void run();
 
 };

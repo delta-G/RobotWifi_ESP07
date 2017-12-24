@@ -38,6 +38,12 @@ void heartbeat();
 
 void scanNetworks();
 
+void connectToHome();
+void connectToHomeExt();
+void connectToBase();
+void beTheAP();
+
+
 void handleClient(char*);
 void handleSerial(char*);
 

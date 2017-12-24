@@ -32,15 +32,16 @@ RobotWifi-ESP07  --  runs on ESP8266 and handles WiFi communications for my robo
 #include "RobotWifi_ESP07.h"
 
 
-#define USE_HOME_WIFI
-
+//#define USE_HOME_WIFI
 //#define USE_ESP_AS_HOTSPOT_STATIC
 //#define USE_ESP_AS_HOTSPOT
+//#define USE_BASE_STATION_WIFI
 
 
 const uint8_t heartbeatPin = 12;
 uint16_t heartbeatDelay = 2000;
 unsigned long lastMil = millis();
+boolean lastConnected = false;
 
 const char* ssid = MY_NETWORK_SSID;
 const char* pwd = MY_NETWORK_PASSWORD;
@@ -61,7 +62,7 @@ void setupWiFi() {
 	IPAddress gate(192, 168, 1, 1);
 	IPAddress sub(255, 255, 255, 0);
 
-	Serial.println("Setting Up WiFi");
+//	Serial.println("Setting Up WiFi");
 
 	WiFi.mode(WIFI_STA);
 	WiFi.config(ipa, gate, sub);
@@ -76,6 +77,27 @@ void setupWiFi() {
 	}
 
 #endif
+
+#ifdef USE_BASE_STATION_WIFI
+
+	IPAddress ipa(10, 10, 0, 24);
+	IPAddress gate(10, 10, 0, 1);
+	IPAddress sub(255, 255, 255, 0);
+
+	WiFi.mode(WIFI_STA);
+		WiFi.config(ipa, gate, sub);
+		WiFi.begin("Disco_Bot_Base", "12341234");
+
+		heartbeatDelay = 100;
+
+		while (WiFi.status() != WL_CONNECTED) {
+			delay(500);
+			Serial.print(".");
+			heartbeat();
+		}
+
+#endif
+
 
 #ifdef USE_ESP_AS_HOTSPOT_STATIC
 	//  This section for AP Mode with static IP. (Untested!!!)
@@ -96,9 +118,126 @@ void setupWiFi() {
 //	Serial.println(WiFi.localIP());
 #endif
 
+
+
+
+
 	delay(500);
 
 }
+
+
+void scanAndSetup() {
+
+	int count = WiFi.scanNetworks();
+
+	static int homeStrength;
+	static int extStrength;
+
+	for (int i = 0; i < count; i++) {
+
+		if(WiFi.SSID(i).lastIndexOf("Disco_Bot_Base") > -1){
+			connectToBase();
+			return;
+		}
+
+		else if(WiFi.SSID(i).lastIndexOf("Disco_Radio_EXT") > -1){
+			extStrength = WiFi.RSSI(i);
+		}
+
+		else if(WiFi.SSID(i).lastIndexOf("Disco_Radio") > -1){
+			homeStrength = WiFi.RSSI(i);
+		}
+	}
+
+
+	if (extStrength > homeStrength ){
+		connectToHomeExt();
+	}
+	else {
+		connectToHome();
+	}
+}
+
+void beTheAP() {
+	// This function is AP Mode with 192.168.4.1
+	WiFi.mode(WIFI_AP);
+	WiFi.softAP("RControl");
+}
+
+void connectToBase() {
+	IPAddress ipa(10, 10, 0, 24);
+	IPAddress gate(10, 10, 0, 1);
+	IPAddress sub(255, 255, 255, 0);
+
+	WiFi.mode(WIFI_STA);
+	WiFi.config(ipa, gate, sub);
+	WiFi.begin("Disco_Bot_Base", "12341234");
+
+	heartbeatDelay = 100;
+
+	while (WiFi.status() != WL_CONNECTED) {
+		delay(500);
+		Serial.print(".");
+		heartbeat();
+	}
+}
+
+void connectToHome() {
+
+	IPAddress ipa(192, 168, 1, 75);
+	IPAddress gate(192, 168, 1, 1);
+	IPAddress sub(255, 255, 255, 0);
+
+	//	Serial.println("Setting Up WiFi");
+
+	WiFi.mode(WIFI_STA);
+	WiFi.config(ipa, gate, sub);
+	WiFi.begin(ssid, pwd);
+
+	heartbeatDelay = 100;
+
+	while (WiFi.status() != WL_CONNECTED) {
+		delay(500);
+		Serial.print(".");
+		heartbeat();
+	}
+}
+
+
+void connectToHomeExt() {
+
+	IPAddress ipa(192, 168, 1, 75);
+	IPAddress gate(192, 168, 1, 1);
+	IPAddress sub(255, 255, 255, 0);
+
+	//	Serial.println("Setting Up WiFi");
+
+	WiFi.mode(WIFI_STA);
+	WiFi.config(ipa, gate, sub);
+
+	char extssid[50];
+
+	strcpy(extssid, ssid);
+
+	int i = strlen(ssid);
+
+	strcpy (extssid + i, "_EXT");
+
+	WiFi.begin(extssid, pwd);
+
+	heartbeatDelay = 100;
+
+	while (WiFi.status() != WL_CONNECTED) {
+		delay(500);
+		Serial.print(".");
+		heartbeat();
+	}
+}
+
+
+
+
 
 void setup() {
 
@@ -116,11 +255,10 @@ void setup() {
 	Serial.begin(115200);
 	delay(500);
 
-	setupWiFi();
+//	setupWiFi();
+	scanAndSetup();
 
 	server.begin();
-
-	heartbeatDelay = 250;
 
 //	while (!client.connected()) {
 //		client = server.available();
@@ -133,13 +271,21 @@ void setup() {
 }
 
 void loop() {
+
 	heartbeat();
 
 	if (!client.connected()) {
+		if(lastConnected == true){
+			// If we just lost connection kill the motors.
+			Serial.print("<ML,0>");
+			Serial.print("<MR,0>");
+		}
 		client = server.available();
 		heartbeatDelay = 200;
+		lastConnected = false;
 	} else {
 		heartbeatDelay = 2000;
+		lastConnected = true;
 
 		serialParser.run();
 		clientParser.run();
@@ -171,7 +317,11 @@ void scanNetworks(){
 
 	for (int i = 0; i < count; i++){
 		char buf[100] = {0};
-		sprintf(buf, "<%d,%d>", WiFi.SSID(i), WiFi.RSSI(i));
+		int len = WiFi.SSID(i).length() + 1;
+		char sbuf[len];
+		WiFi.SSID(i).toCharArray(sbuf, len);
+
+		sprintf(buf, "<%s,%d>",sbuf , WiFi.RSSI(i));
 		client.print(buf);
 	}
 
