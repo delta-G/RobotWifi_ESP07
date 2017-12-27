@@ -235,7 +235,13 @@ void connectToHomeExt() {
 	}
 }
 
-
+void killConnection() {
+	client.stop();
+	WiFi.disconnect();
+	delay(5000);
+	scanAndSetup();
+	server.begin();
+}
 
 
 
@@ -284,6 +290,11 @@ void loop() {
 		heartbeatDelay = 200;
 		lastConnected = false;
 	} else {
+		if(lastConnected == false){
+			// if we just now regained connection
+			String notif = "<E  NewClient @ " + WiFi.SSID() + "," + WiFi.RSSI() + ">";
+			client.print(notif);
+		}
 		heartbeatDelay = 2000;
 		lastConnected = true;
 
@@ -335,6 +346,15 @@ void handleClient(char* aBuf){
 		case 'W':
 			scanNetworks();
 			break;
+		case 'C':
+			String notif = "<E  NewClient @ " + WiFi.SSID() + "," + WiFi.RSSI() + ">";
+			client.print(notif);
+			break;
+		case 'X':
+			// Disconnect, scan and reconnect
+			killConnection();
+			break;
+
 		default:
 			client.print("<Bad Command>");
 		}

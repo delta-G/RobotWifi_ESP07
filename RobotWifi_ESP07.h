@@ -43,6 +43,7 @@ void connectToHomeExt();
 void connectToBase();
 void beTheAP();
 
+void killConnection();
 
 void handleClient(char*);
 void handleSerial(char*);
