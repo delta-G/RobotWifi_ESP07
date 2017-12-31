@@ -46,6 +46,7 @@ private:
 public:
 
 	StreamParser(Stream* aIn, char aSop, char aEop, void(*aCallback)(char*)):index(0), in(aIn), sop(aSop), eop(aEop), callback(aCallback), receiving(false){};
+	StreamParser(Stream* aIn, void(*aCallback)(char*)):index(0), in(aIn), sop('<'), eop('>'), callback(aCallback), receiving(false){};
 	void run();
 
 };
