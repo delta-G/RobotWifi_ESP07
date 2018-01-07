@@ -32,10 +32,13 @@ RobotWifi-ESP07  --  runs on ESP8266 and handles WiFi communications for my robo
 #include "RobotWifi_ESP07.h"
 
 
-//#define USE_HOME_WIFI
-//#define USE_ESP_AS_HOTSPOT_STATIC
-//#define USE_ESP_AS_HOTSPOT
-#define USE_BASE_STATION_WIFI
+//#define DEBUG_OUT Serial
+
+#ifdef DEBUG_OUT
+#define DEBUG(x) DEBUG_OUT.println(x)
+#else
+#define DEBUG(x)
+#endif
 
 
 const uint8_t heartbeatPin = 12;
@@ -53,83 +56,14 @@ StreamParser serialParser(&Serial, START_OF_PACKET, END_OF_PACKET, handleSerial)
 StreamParser clientParser(&client, START_OF_PACKET, END_OF_PACKET, handleClient);
 
 
+void setupWifi() {
 
-void setupWiFi() {
+	DEBUG("scanAndSetup");
 
-#ifdef USE_HOME_WIFI
-
-	IPAddress ipa(192, 168, 1, 75);
-	IPAddress gate(192, 168, 1, 1);
-	IPAddress sub(255, 255, 255, 0);
-
-//	Serial.println("Setting Up WiFi");
-
-	WiFi.mode(WIFI_STA);
-	WiFi.config(ipa, gate, sub);
-	WiFi.begin(ssid, pwd);
-
-	heartbeatDelay = 100;
-
-	while (WiFi.status() != WL_CONNECTED) {
-		delay(500);
-		Serial.print(".");
-		heartbeat();
-	}
-
-#endif
-
-#ifdef USE_BASE_STATION_WIFI
-
-	IPAddress ipa(10, 10, 0, 24);
-	IPAddress gate(10, 10, 0, 1);
-	IPAddress sub(255, 255, 255, 0);
-
-	WiFi.mode(WIFI_STA);
-		WiFi.config(ipa, gate, sub);
-		WiFi.begin("Disco_Bot_Base", "12341234");
-
-		heartbeatDelay = 100;
-
-		while (WiFi.status() != WL_CONNECTED) {
-			delay(500);
-			Serial.print(".");
-			heartbeat();
-		}
-
-#endif
-
-
-#ifdef USE_ESP_AS_HOTSPOT_STATIC
-	//  This section for AP Mode with static IP. (Untested!!!)
-
-
-//	WiFi.mode(WIFI_AP_STA);
-//	WiFi.softAPConfig(ipa, gate, sub);
-//	WiFi.softAP("RControl");
-
-#endif
-
-#ifdef USE_ESP_AS_HOTSPOT
-
-	// This section is AP Mode with 192.168.4.1
-	WiFi.mode(WIFI_AP);
-	WiFi.softAP("RControl");
-//	Serial.println("");
-//	Serial.println(WiFi.localIP());
-#endif
-
-
-
-
-
-	delay(500);
-
-}
-
-
-void scanAndSetup() {
 
 	int count = WiFi.scanNetworks();
+
+	DEBUG(count);
 
 	static int homeStrength = 0;
 	static int extStrength = 0;
@@ -137,15 +71,18 @@ void scanAndSetup() {
 	for (int i = 0; i < count; i++) {
 
 		if(WiFi.SSID(i).lastIndexOf("Disco_Bot_Base") > -1){
+			DEBUG("FOUND-BASE-WIFI");
 			connectToBase();
 			return;
 		}
 
 		else if(WiFi.SSID(i).lastIndexOf("Disco_Radio_EXT") > -1){
+			DEBUG("FOUND-EXT-WIFI");
 			extStrength = WiFi.RSSI(i);
 		}
 
 		else if(WiFi.SSID(i).lastIndexOf("Disco_Radio") > -1){
+			DEBUG("FOUND-HOME-WIFI");
 			homeStrength = WiFi.RSSI(i);
 		}
 	}
@@ -166,6 +103,7 @@ void scanAndSetup() {
 
 void beTheAP() {
 	// This function is AP Mode with 192.168.4.1
+	DEBUG("be the AP");
 	WiFi.mode(WIFI_AP);
 	WiFi.softAP("RControl");
 }
@@ -183,18 +121,17 @@ void connectToBase() {
 
 	while (WiFi.status() != WL_CONNECTED) {
 		delay(50);
-//		Serial.print(".");
 		heartbeat();
 	}
 }
 
 void connectToHome() {
+	DEBUG("connecting to home");
 
 	IPAddress ipa(192, 168, 1, 75);
 	IPAddress gate(192, 168, 1, 1);
 	IPAddress sub(255, 255, 255, 0);
 
-	//	Serial.println("Setting Up WiFi");
 
 	WiFi.mode(WIFI_STA);
 	WiFi.config(ipa, gate, sub);
@@ -211,12 +148,12 @@ void connectToHome() {
 
 
 void connectToHomeExt() {
+	DEBUG("connecting to ext");
 
 	IPAddress ipa(192, 168, 1, 75);
 	IPAddress gate(192, 168, 1, 1);
 	IPAddress sub(255, 255, 255, 0);
 
-	//	Serial.println("Setting Up WiFi");
 
 	WiFi.mode(WIFI_STA);
 	WiFi.config(ipa, gate, sub);
@@ -244,7 +181,7 @@ void killConnection() {
 	client.stop();
 	WiFi.disconnect();
 	delay(5000);
-	scanAndSetup();
+	setupWifi();
 	server.begin();
 }
 
@@ -266,8 +203,10 @@ void setup() {
 	Serial.begin(115200);
 	delay(500);
 
-	setupWiFi();
-//	scanAndSetup();
+	DEBUG("Beginning");
+
+	setupWifi();
+	DEBUG("Back from scan and setup");
 
 	server.begin();
 
@@ -277,7 +216,9 @@ void setup() {
 //	}
 
 	heartbeatDelay = 2000;
-	//client.print("<Connected ESP07>");
+	//client.print("<Connected ESP07");
+
+	DEBUG("EndOfSetup");
 
 }
 
@@ -287,6 +228,7 @@ void loop() {
 
 	if (!client.connected()) {
 		if(lastConnected == true){
+			DEBUG("LOST CONNECTION");
 			// If we just lost connection kill the motors.
 			Serial.print("<ML,0>");
 			Serial.print("<MR,0>");
@@ -298,6 +240,7 @@ void loop() {
 		if(lastConnected == false){
 			// if we just now regained connection
 			String notif = "<E  NewClient @ " + WiFi.SSID() + "," + WiFi.RSSI() + ">";
+			DEBUG(notif);
 			client.print(notif);
 		}
 		heartbeatDelay = 2000;
