@@ -22,7 +22,6 @@ RobotWifi-ESP07  --  runs on ESP8266 and handles WiFi communications for my robo
 #define STREAMPARSER_H_
 
 #include "Arduino.h"
-#include "ESP8266WiFi.h"
 
 #define BUFFER_SIZE 100
 

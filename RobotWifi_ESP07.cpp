@@ -32,10 +32,10 @@ RobotWifi-ESP07  --  runs on ESP8266 and handles WiFi communications for my robo
 #include "RobotWifi_ESP07.h"
 
 
-#define USE_HOME_WIFI
+//#define USE_HOME_WIFI
 //#define USE_ESP_AS_HOTSPOT_STATIC
 //#define USE_ESP_AS_HOTSPOT
-//#define USE_BASE_STATION_WIFI
+#define USE_BASE_STATION_WIFI
 
 
 const uint8_t heartbeatPin = 12;
@@ -131,8 +131,8 @@ void scanAndSetup() {
 
 	int count = WiFi.scanNetworks();
 
-	static int homeStrength;
-	static int extStrength;
+	static int homeStrength = 0;
+	static int extStrength = 0;
 
 	for (int i = 0; i < count; i++) {
 
@@ -152,12 +152,16 @@ void scanAndSetup() {
 
 	//  If we got here then we didn't find Disco_Bot_Base
 	//  so see about other networks.
-	if (extStrength > homeStrength ){
-		connectToHomeExt();
+	if (extStrength || homeStrength) {
+		if (extStrength > homeStrength) {
+			connectToHomeExt();
+		} else {
+			connectToHome();
+		}
+	} else {
+		beTheAP();
 	}
-	else {
-		connectToHome();
-	}
+
 }
 
 void beTheAP() {
@@ -262,8 +266,8 @@ void setup() {
 	Serial.begin(115200);
 	delay(500);
 
-//	setupWiFi();
-	scanAndSetup();
+	setupWiFi();
+//	scanAndSetup();
 
 	server.begin();
 
