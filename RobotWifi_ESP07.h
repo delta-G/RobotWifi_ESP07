@@ -47,6 +47,7 @@ void killConnection();
 
 void handleClient(char*);
 void handleSerial(char*);
+void waitOnRMB(char*);
 
 
 #endif /* _RobotWifi_ESP07_H_ */

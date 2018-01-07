@@ -41,10 +41,15 @@ RobotWifi-ESP07  --  runs on ESP8266 and handles WiFi communications for my robo
 #endif
 
 
+enum States {BOOTUP, WAITING_ON_RMB, RUNNING} currentState;
+
 const uint8_t heartbeatPin = 12;
 uint16_t heartbeatDelay = 2000;
 unsigned long lastMil = millis();
 boolean lastConnected = false;
+
+boolean rmbActive = false;
+boolean WiFiConnected = false;
 
 const char* ssid = MY_NETWORK_SSID;
 const char* pwd = MY_NETWORK_PASSWORD;
@@ -52,9 +57,192 @@ const char* pwd = MY_NETWORK_PASSWORD;
 WiFiServer server(1234);
 WiFiClient client;
 
-StreamParser serialParser(&Serial, START_OF_PACKET, END_OF_PACKET, handleSerial);
+StreamParser serialParser(&Serial, START_OF_PACKET, END_OF_PACKET, waitOnRMB);
 StreamParser clientParser(&client, START_OF_PACKET, END_OF_PACKET, handleClient);
 
+
+
+
+/**********************************************************
+ *
+ * Right off the bat there is 1.5 seconds of delay as the LED bumps
+ *
+ * Serial is connected at 1.5 seconds
+ *
+ * Go to connect WiFi at 2.0 seconds
+ *
+ **********************************************************/
+
+void setup() {
+
+	pinMode(heartbeatPin, OUTPUT);
+	digitalWrite(heartbeatPin, HIGH);
+	delay(500);
+	digitalWrite(heartbeatPin, LOW);
+	delay(250);
+	digitalWrite(heartbeatPin, HIGH);
+	delay(500);
+	digitalWrite(heartbeatPin, LOW);
+	delay(250);
+	digitalWrite(heartbeatPin, HIGH);
+
+	Serial.begin(115200);
+	delay(500);
+
+	DEBUG("Beginning");
+
+	setupWifi();
+	DEBUG("Back from scan and setup");
+
+	WiFiConnected = true;
+
+
+	server.begin();
+
+	heartbeatDelay = 500;
+
+	DEBUG("EndOfSetup");
+
+	currentState = WAITING_ON_RMB;
+
+}
+
+void loop() {
+
+	heartbeat();
+
+	switch (currentState) {
+
+	case WAITING_ON_RMB: {
+		if(rmbActive){
+			serialParser.setCallback(handleSerial);
+			Serial.print("<ESTART>");
+			Serial.print("<ECONNECT>");
+			currentState = RUNNING;
+		}
+		break;
+	}
+	case RUNNING: {
+		if (!client.connected()) {
+			if (lastConnected == true) {
+				DEBUG("LOST CONNECTION");
+				// If we just lost connection kill the motors.
+				Serial.print("<ML,0>");
+				Serial.print("<MR,0>");
+			}
+			client = server.available();
+			heartbeatDelay = 200;
+			lastConnected = false;
+		} else {
+			if (lastConnected == false) {
+				// if we just now regained connection
+				String notif = "<E  NewClient @ " + WiFi.SSID() + ","
+						+ WiFi.RSSI() + ">";
+				DEBUG(notif);
+				client.print(notif);
+			}
+			heartbeatDelay = 2000;
+			lastConnected = true;
+		}
+		break;
+	}
+	default: {
+		//we shouldn't be here - Freak out
+		heartbeatDelay = 50;
+		break;
+	}
+
+	}
+
+	serialParser.run();
+	clientParser.run();
+
+}
+
+void heartbeat() {
+	static boolean heartState = false;
+
+	//static unsigned long lastMil = millis();
+	unsigned long curMil = millis();
+
+	if (curMil - lastMil >= heartbeatDelay) {
+		heartState = !heartState;
+		digitalWrite(heartbeatPin, heartState);
+		lastMil = curMil;
+		if (client.connected()) {
+				client.print("<E-HB");
+				client.print(WiFi.RSSI());
+				client.print(">");
+			}
+	}
+}
+
+
+void scanNetworks(){
+
+	int count = WiFi.scanNetworks();
+
+	for (int i = 0; i < count; i++){
+		char buf[100] = {0};
+		int len = WiFi.SSID(i).length() + 1;
+		char sbuf[len];
+		WiFi.SSID(i).toCharArray(sbuf, len);
+
+		sprintf(buf, "<%s,%d>",sbuf , WiFi.RSSI(i));
+		client.print(buf);
+	}
+
+}
+
+
+void handleClient(char* aBuf){
+
+	//   'E' denotes commands for the ESP8266
+	if(aBuf[1] == 'E'){
+		switch(aBuf[2]){
+		case 'W':
+			scanNetworks();
+			break;
+		case 'C':
+		{
+			String notif = "<E  NewClient @ " + WiFi.SSID() + "," + WiFi.RSSI() + ">";
+			client.print(notif);
+			break;
+		}
+		case 'X':
+			// Disconnect, scan and reconnect
+			killConnection();
+			break;
+
+		default:
+			client.print("<Bad Command>");
+		}
+	}
+	else {
+		//  Everything else goes to Main Brain
+		Serial.print(aBuf);
+	}
+}
+
+void handleSerial(char* aBuf) {
+	if (aBuf[1] == 'E') {
+		switch (aBuf[2]) {
+		case 'H':
+			Serial.print("<^_^>");
+			break;
+		default:
+			break;
+		}
+	} else {
+		client.print(aBuf);
+	}
+}
+
+void waitOnRMB(char* aBuf) {
+	if (strcmp(aBuf, "<E-RMB-Active>") == 0){
+		rmbActive = true;
+	}
+}
 
 void setupWifi() {
 
@@ -140,8 +328,7 @@ void connectToHome() {
 	heartbeatDelay = 100;
 
 	while (WiFi.status() != WL_CONNECTED) {
-		delay(500);
-		Serial.print(".");
+		delay(50);
 		heartbeat();
 	}
 }
@@ -171,8 +358,7 @@ void connectToHomeExt() {
 	heartbeatDelay = 100;
 
 	while (WiFi.status() != WL_CONNECTED) {
-		delay(500);
-		Serial.print(".");
+		delay(50);
 		heartbeat();
 	}
 }
@@ -184,151 +370,4 @@ void killConnection() {
 	setupWifi();
 	server.begin();
 }
-
-
-
-void setup() {
-
-	pinMode(heartbeatPin, OUTPUT);
-	digitalWrite(heartbeatPin, HIGH);
-	delay(500);
-	digitalWrite(heartbeatPin, LOW);
-	delay(250);
-	digitalWrite(heartbeatPin, HIGH);
-	delay(500);
-	digitalWrite(heartbeatPin, LOW);
-	delay(250);
-	digitalWrite(heartbeatPin, HIGH);
-
-	Serial.begin(115200);
-	delay(500);
-
-	DEBUG("Beginning");
-
-	setupWifi();
-	DEBUG("Back from scan and setup");
-
-	server.begin();
-
-//	while (!client.connected()) {
-//		client = server.available();
-//		heartbeat();
-//	}
-
-	heartbeatDelay = 2000;
-	//client.print("<Connected ESP07");
-
-	DEBUG("EndOfSetup");
-
-}
-
-void loop() {
-
-	heartbeat();
-
-	if (!client.connected()) {
-		if(lastConnected == true){
-			DEBUG("LOST CONNECTION");
-			// If we just lost connection kill the motors.
-			Serial.print("<ML,0>");
-			Serial.print("<MR,0>");
-		}
-		client = server.available();
-		heartbeatDelay = 200;
-		lastConnected = false;
-	} else {
-		if(lastConnected == false){
-			// if we just now regained connection
-			String notif = "<E  NewClient @ " + WiFi.SSID() + "," + WiFi.RSSI() + ">";
-			DEBUG(notif);
-			client.print(notif);
-		}
-		heartbeatDelay = 2000;
-		lastConnected = true;
-
-		serialParser.run();
-		clientParser.run();
-	}
-}
-
-void heartbeat() {
-	static boolean heartState = false;
-
-	//static unsigned long lastMil = millis();
-	unsigned long curMil = millis();
-
-	if (curMil - lastMil >= heartbeatDelay) {
-		heartState = !heartState;
-		digitalWrite(heartbeatPin, heartState);
-		lastMil = curMil;
-		if (client.connected()) {
-				client.print("<E-HB");
-				client.print(WiFi.RSSI());
-				client.print(">");
-			}
-	}
-}
-
-
-void scanNetworks(){
-
-	int count = WiFi.scanNetworks();
-
-	for (int i = 0; i < count; i++){
-		char buf[100] = {0};
-		int len = WiFi.SSID(i).length() + 1;
-		char sbuf[len];
-		WiFi.SSID(i).toCharArray(sbuf, len);
-
-		sprintf(buf, "<%s,%d>",sbuf , WiFi.RSSI(i));
-		client.print(buf);
-	}
-
-}
-
-
-void handleClient(char* aBuf){
-
-	//   'E' denotes commands for the ESP8266
-	if(aBuf[1] == 'E'){
-		switch(aBuf[2]){
-		case 'W':
-			scanNetworks();
-			break;
-		case 'C':
-		{
-			String notif = "<E  NewClient @ " + WiFi.SSID() + "," + WiFi.RSSI() + ">";
-			client.print(notif);
-			break;
-		}
-		case 'X':
-			// Disconnect, scan and reconnect
-			killConnection();
-			break;
-
-		default:
-			client.print("<Bad Command>");
-		}
-	}
-	else {
-		//  Everything else goes to Main Brain
-		Serial.print(aBuf);
-	}
-}
-
-void handleSerial(char* aBuf) {
-	if (aBuf[1] == 'E') {
-		switch (aBuf[2]) {
-		case 'H':
-			Serial.print("<^_^>");
-			break;
-		default:
-			break;
-		}
-	} else {
-		client.print(aBuf);
-	}
-}
-
-
 

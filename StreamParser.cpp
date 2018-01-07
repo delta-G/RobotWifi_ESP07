@@ -46,5 +46,8 @@ void StreamParser::run(){
 }
 
 
+void StreamParser::setCallback(void (*aCall)(char*)){
+	callback = aCall;
+}
 
 

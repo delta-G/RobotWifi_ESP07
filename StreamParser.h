@@ -48,6 +48,8 @@ public:
 	StreamParser(Stream* aIn, void(*aCallback)(char*)):index(0), in(aIn), sop('<'), eop('>'), callback(aCallback), receiving(false){};
 	void run();
 
+	void setCallback(void (*aCall)(char*));
+
 };
 
 
