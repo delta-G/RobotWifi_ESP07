@@ -54,7 +54,7 @@ boolean WiFiConnected = false;
 const char* ssid = MY_NETWORK_SSID;
 const char* pwd = MY_NETWORK_PASSWORD;
 
-WiFiServer server(1234);
+WiFiServer server(ROBOT_PORT);
 WiFiClient client;
 
 StreamParser serialParser(&Serial, START_OF_PACKET, END_OF_PACKET, waitOnRMB);
@@ -86,7 +86,7 @@ void setup() {
 	delay(250);
 	digitalWrite(heartbeatPin, HIGH);
 
-	Serial.begin(115200);
+	Serial.begin(ROBOT_COM_BAUD);
 	delay(500);
 
 	DEBUG("Beginning");
@@ -116,8 +116,8 @@ void loop() {
 	case WAITING_ON_RMB: {
 		if(rmbActive){
 			serialParser.setCallback(handleSerial);
-			Serial.print("<ESTART>");
-			Serial.print("<ECONNECT>");
+			Serial.print(COM_START_STRING);
+			Serial.print(COM_CONNECT_STRING);
 			currentState = RUNNING;
 		}
 		break;
@@ -215,7 +215,7 @@ void handleClient(char* aBuf){
 			break;
 
 		default:
-			client.print("<Bad Command>");
+			client.print(BAD_COMMAND_STRING);
 		}
 	}
 	else {
@@ -239,10 +239,19 @@ void handleSerial(char* aBuf) {
 }
 
 void waitOnRMB(char* aBuf) {
-	if (strcmp(aBuf, "<E-RMB-Active>") == 0){
+	if (strcmp(aBuf, RMB_STARTUP_STRING) == 0){
 		rmbActive = true;
 	}
 }
+
+
+////   **TODO:
+/*
+ * This code should build an array or linked list or something of all the SSID that it finds.
+ * Or at least the ones it recognizes or aren't secure
+ * Then we can parse through that list later and decide what we want to connect to
+ *
+ */
 
 void setupWifi() {
 
@@ -279,7 +288,7 @@ void setupWifi() {
 	//  so see about other networks.
 	if (extStrength || homeStrength) {
 		if (extStrength > homeStrength) {
-			connectToHomeExt();
+			connectToHome();
 		} else {
 			connectToHome();
 		}
@@ -316,9 +325,9 @@ void connectToBase() {
 void connectToHome() {
 	DEBUG("connecting to home");
 
-	IPAddress ipa(192, 168, 1, 75);
-	IPAddress gate(192, 168, 1, 1);
-	IPAddress sub(255, 255, 255, 0);
+	IPAddress ipa(ROBOT_IP);
+	IPAddress gate(MY_DEFAULT_GATEWAY);
+	IPAddress sub(MY_NETMASK);
 
 
 	WiFi.mode(WIFI_STA);
@@ -337,9 +346,9 @@ void connectToHome() {
 void connectToHomeExt() {
 	DEBUG("connecting to ext");
 
-	IPAddress ipa(192, 168, 1, 75);
-	IPAddress gate(192, 168, 1, 1);
-	IPAddress sub(255, 255, 255, 0);
+	IPAddress ipa(ROBOT_IP);
+	IPAddress gate(MY_DEFAULT_GATEWAY);
+	IPAddress sub(MY_NETMASK);
 
 
 	WiFi.mode(WIFI_STA);
