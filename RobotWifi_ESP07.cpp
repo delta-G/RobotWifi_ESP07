@@ -114,7 +114,7 @@ void loop() {
 	switch (bootState) {
 
 	case WAITING_ON_RMB: {
-		if(rmbActive){
+		if(rmbActive){   // gets set by Serial parser
 			serialParser.setCallback(handleSerial);
 			Serial.print(COM_START_STRING);
 			Serial.print(COM_CONNECT_STRING);
@@ -288,7 +288,7 @@ void setupWifi() {
 	//  so see about other networks.
 	if (extStrength || homeStrength) {
 		if (extStrength > homeStrength) {
-			connectToHome();
+			connectToHomeExt();
 		} else {
 			connectToHome();
 		}
