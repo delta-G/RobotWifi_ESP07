@@ -41,7 +41,7 @@ RobotWifi-ESP07  --  runs on ESP8266 and handles WiFi communications for my robo
 #endif
 
 
-enum States {BOOTUP, WAITING_ON_RMB, RUNNING} currentState;
+enum States {BOOTUP, WAITING_ON_RMB, RUNNING} bootState;
 
 const uint8_t heartbeatPin = 12;
 uint16_t heartbeatDelay = 2000;
@@ -103,7 +103,7 @@ void setup() {
 
 	DEBUG("EndOfSetup");
 
-	currentState = WAITING_ON_RMB;
+	bootState = WAITING_ON_RMB;
 
 }
 
@@ -111,14 +111,14 @@ void loop() {
 
 	heartbeat();
 
-	switch (currentState) {
+	switch (bootState) {
 
 	case WAITING_ON_RMB: {
 		if(rmbActive){
 			serialParser.setCallback(handleSerial);
 			Serial.print(COM_START_STRING);
 			Serial.print(COM_CONNECT_STRING);
-			currentState = RUNNING;
+			bootState = RUNNING;
 		}
 		break;
 	}
