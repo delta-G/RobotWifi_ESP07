@@ -196,10 +196,15 @@ void scanNetworks(){
 
 
 void handleClient(char* aBuf){
-
 	//   'E' denotes commands for the ESP8266
 	if(aBuf[1] == 'E'){
 		switch(aBuf[2]){
+		case 'G':
+		{
+			String notif = "<E GitHash - " + GIT_HASH + ">";
+			client.print(notif);
+			break;
+		}
 		case 'W':
 			scanNetworks();
 			break;
