@@ -86,6 +86,7 @@ void setup() {
 	delay(250);
 	digitalWrite(heartbeatPin, HIGH);
 
+
 	Serial.begin(ROBOT_COM_BAUD);
 	delay(500);
 
@@ -119,6 +120,7 @@ void loop() {
 			Serial.print(COM_START_STRING);
 			Serial.print(COM_CONNECT_STRING);
 			bootState = RUNNING;
+			DEBUG(".");
 		}
 		break;
 	}
@@ -127,6 +129,9 @@ void loop() {
 			if (lastConnected == true) {
 				DEBUG("LOST CONNECTION");
 				// If we just lost connection kill the motors.
+				// TODO:  We should just tell main brain that
+				// we lost connection and let him figure out
+				// what to do
 				Serial.print("<ML,0>");
 				Serial.print("<MR,0>");
 			}
@@ -201,7 +206,7 @@ void handleClient(char* aBuf){
 		switch(aBuf[2]){
 		case 'G':
 		{
-			String notif = "<E GitHash - " + GIT_HASH + ">";
+			String notif = String("<E GitHash - ") + GIT_HASH + ">";
 			client.print(notif);
 			break;
 		}
@@ -220,7 +225,7 @@ void handleClient(char* aBuf){
 			break;
 
 		default:
-			client.print(BAD_COMMAND_STRING);
+			client.print("Bad Command ESP");
 		}
 	}
 	else {
@@ -267,8 +272,8 @@ void setupWifi() {
 
 	DEBUG(count);
 
-	static int homeStrength = 0;
-	static int extStrength = 0;
+	static int homeStrength = -10000;
+	static int extStrength = -10000;
 
 	for (int i = 0; i < count; i++) {
 

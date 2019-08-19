@@ -29,7 +29,7 @@ RobotWifi-ESP07  --  runs on ESP8266 and handles WiFi communications for my robo
 #include "ESP8266WiFi.h"
 
 #include <StreamParser.h>
-
+// includes file not in repository with githash of current commit
 #include "githash.h"
 
 
