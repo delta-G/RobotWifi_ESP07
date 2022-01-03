@@ -43,7 +43,7 @@ RobotWifi-ESP07  --  runs on ESP8266 and handles WiFi communications for my robo
 
 enum States {BOOTUP, WAITING_ON_RMB, RUNNING} bootState;
 
-const uint8_t heartbeatPin = 12;
+const uint8_t heartbeatPin = 2;
 uint16_t heartbeatDelay = 2000;
 unsigned long lastMil = millis();
 boolean lastConnected = false;
@@ -76,6 +76,7 @@ StreamParser clientParser(&client, START_OF_PACKET, END_OF_PACKET, handleClient)
 void setup() {
 
 	pinMode(heartbeatPin, OUTPUT);
+	while(1){
 	digitalWrite(heartbeatPin, HIGH);
 	delay(500);
 	digitalWrite(heartbeatPin, LOW);
@@ -85,6 +86,8 @@ void setup() {
 	digitalWrite(heartbeatPin, LOW);
 	delay(250);
 	digitalWrite(heartbeatPin, HIGH);
+	delay(1000);
+	}
 
 
 	Serial.begin(ROBOT_COM_BAUD);
