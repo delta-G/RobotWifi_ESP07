@@ -48,7 +48,9 @@ void beTheAP();
 void killConnection();
 
 void handleClient(char*);
+void handleClientRaw(char*);
 void handleSerial(char*);
+void handleSerialRaw(char*);
 void waitOnRMB(char*);
 
 

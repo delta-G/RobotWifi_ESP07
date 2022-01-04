@@ -41,15 +41,21 @@ RobotWifi-ESP07  --  runs on ESP8266 and handles WiFi communications for my robo
 #endif
 
 
-enum States {BOOTUP, WAITING_ON_RMB, RUNNING} bootState;
+enum States {BOOTUP, WAITING_ON_RMB, WAITING_ON_BASE, RUNNING} bootState;
 
 const uint8_t heartbeatPin = 2;
 uint16_t heartbeatDelay = 2000;
 unsigned long lastMil = millis();
 boolean lastConnected = false;
 
+uint32_t lastCommandTime;
+uint32_t commandTimeout = 20000;
+boolean blackoutReported = false;
+
+
 boolean rmbActive = false;
 boolean WiFiConnected = false;
+boolean connectedToBase = false;
 
 const char* ssid = MY_NETWORK_SSID;
 const char* pwd = MY_NETWORK_PASSWORD;
@@ -76,7 +82,6 @@ StreamParser clientParser(&client, START_OF_PACKET, END_OF_PACKET, handleClient)
 void setup() {
 
 	pinMode(heartbeatPin, OUTPUT);
-	while(1){
 	digitalWrite(heartbeatPin, HIGH);
 	delay(500);
 	digitalWrite(heartbeatPin, LOW);
@@ -86,8 +91,6 @@ void setup() {
 	digitalWrite(heartbeatPin, LOW);
 	delay(250);
 	digitalWrite(heartbeatPin, HIGH);
-	delay(1000);
-	}
 
 
 	Serial.begin(ROBOT_COM_BAUD);
@@ -121,22 +124,22 @@ void loop() {
 		if(rmbActive){   // gets set by Serial parser
 			serialParser.setCallback(handleSerial);
 			Serial.print(COM_START_STRING);
-			Serial.print(COM_CONNECT_STRING);
-			bootState = RUNNING;
+			bootState = WAITING_ON_BASE;
 			DEBUG(".");
 		}
 		break;
 	}
+	case WAITING_ON_BASE:
+		if (connectedToBase) {
+			Serial.print(COM_CONNECT_STRING);
+			heartbeatDelay = 2000;
+			bootState = RUNNING;
+		}
+		break;
 	case RUNNING: {
 		if (!client.connected()) {
 			if (lastConnected == true) {
-				DEBUG("LOST CONNECTION");
-				// If we just lost connection kill the motors.
-				// TODO:  We should just tell main brain that
-				// we lost connection and let him figure out
-				// what to do
-				Serial.print("<ML,0>");
-				Serial.print("<MR,0>");
+				Serial.print("<LOST_COM>");
 			}
 			client = server.available();
 			heartbeatDelay = 200;
@@ -148,9 +151,15 @@ void loop() {
 						+ WiFi.RSSI() + ">";
 				DEBUG(notif);
 				client.print(notif);
+				lastConnected = true;
 			}
-			heartbeatDelay = 2000;
-			lastConnected = true;
+			if (millis() - lastCommandTime >= commandTimeout) {
+				if(!blackoutReported) {
+					Serial.print(F("<LOST_COM>"));
+					blackoutReported = true;
+					heartbeatDelay = 200;
+				}
+			}
 		}
 		break;
 	}
@@ -177,11 +186,11 @@ void heartbeat() {
 		heartState = !heartState;
 		digitalWrite(heartbeatPin, heartState);
 		lastMil = curMil;
-		if (client.connected()) {
-				client.print("<E-HB");
-				client.print(WiFi.RSSI());
-				client.print(">");
-			}
+//		if (client.connected()) {
+//				client.print("<E-HB");
+//				client.print(WiFi.RSSI());
+//				client.print(">");
+//			}
 	}
 }
 
@@ -205,8 +214,19 @@ void scanNetworks(){
 
 void handleClient(char* aBuf){
 	//   'E' denotes commands for the ESP8266
-	if(aBuf[1] == 'E'){
+	if(!strcmp(aBuf, "LGO")){
+		rmbActive = true;
+	}
+	else if(aBuf[1] == 'E'){
 		switch(aBuf[2]){
+		case 'P':
+		{
+			int rvl = atoi((const char*) (aBuf + 3));
+			char resp[10];
+			snprintf(resp, 10, "<p%i>", rvl);
+			client.print(resp);
+			break;
+		}
 		case 'G':
 		{
 			String notif = String("<E GitHash - ") + GIT_HASH + ">";
@@ -228,17 +248,44 @@ void handleClient(char* aBuf){
 			break;
 
 		default:
-			client.print("Bad Command ESP");
+			client.print("<Bad ESP>");
 		}
 	}
-	else {
+	else if(rmbActive){
 		//  Everything else goes to Main Brain
 		Serial.print(aBuf);
 	}
+	lastCommandTime = millis();
+	if(blackoutReported){
+		blackoutReported = false;
+		heartbeatDelay = 2000;
+	}
 }
 
+void handleClientRaw(char* aBuf){
+	uint8_t numBytes = aBuf[2];
+	// if properly formatted message
+	if((aBuf[0] == '<') && (aBuf[numBytes - 1] == '>')) {
+		connectedToBase = true;  //  got a good message must be connected
+		if (rmbActive) {
+			for (uint8_t i = 0; i < numBytes; i++) {
+				Serial.write(aBuf[i]);
+			}
+		}
+	}
+	lastCommandTime = millis();
+	if(blackoutReported){
+		blackoutReported = false;
+		heartbeatDelay = 2000;
+	}
+}
+
+
 void handleSerial(char* aBuf) {
-	if (aBuf[1] == 'E') {
+	if (!strcmp(aBuf, "<FFF>")){
+		DEBUG("Flush Command");
+	}
+	else if (aBuf[1] == 'E') {
 		switch (aBuf[2]) {
 		case 'H':
 			Serial.print("<^_^>");
@@ -249,6 +296,20 @@ void handleSerial(char* aBuf) {
 	} else {
 		client.print(aBuf);
 	}
+}
+
+
+void handleSerialRaw(char* aBuf){
+	uint8_t numBytes = aBuf[2];
+
+	if (aBuf[1] == 0x13 && numBytes == ROBOT_DATA_DUMP_SIZE) {
+		int32_t rssi = WiFi.RSSI();
+		for(int i = 2; i <= 5; i++){
+			aBuf[ROBOT_DATA_DUMP_SIZE - i] = rssi & 0xFF;
+			rssi >>= 8;
+		}
+	}
+	client.print(aBuf);
 }
 
 void waitOnRMB(char* aBuf) {
@@ -267,48 +328,8 @@ void waitOnRMB(char* aBuf) {
  */
 
 void setupWifi() {
-
 	DEBUG("scanAndSetup");
-
-
-	int count = WiFi.scanNetworks();
-
-	DEBUG(count);
-
-	static int homeStrength = -10000;
-	static int extStrength = -10000;
-
-	for (int i = 0; i < count; i++) {
-
-		if(WiFi.SSID(i).lastIndexOf("Disco_Bot_Base") > -1){
-			DEBUG("FOUND-BASE-WIFI");
-			connectToBase();
-			return;
-		}
-
-		else if(WiFi.SSID(i).lastIndexOf("Disco_Radio_EXT") > -1){
-			DEBUG("FOUND-EXT-WIFI");
-			extStrength = WiFi.RSSI(i);
-		}
-
-		else if(WiFi.SSID(i).lastIndexOf("Disco_Radio") > -1){
-			DEBUG("FOUND-HOME-WIFI");
-			homeStrength = WiFi.RSSI(i);
-		}
-	}
-
-	//  If we got here then we didn't find Disco_Bot_Base
-	//  so see about other networks.
-	if (extStrength || homeStrength) {
-		if (extStrength > homeStrength) {
-			connectToHomeExt();
-		} else {
-			connectToHome();
-		}
-	} else {
-		beTheAP();
-	}
-
+	connectToHome();
 }
 
 void beTheAP() {
