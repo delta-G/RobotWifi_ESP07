@@ -130,10 +130,14 @@ void loop() {
 		break;
 	}
 	case WAITING_ON_BASE:
+		if(!client.connected()) {
+			client = server.available();
+		}
 		if (connectedToBase) {
 			Serial.print(COM_CONNECT_STRING);
 			heartbeatDelay = 2000;
 			bootState = RUNNING;
+			lastConnected = true;
 		}
 		break;
 	case RUNNING: {
@@ -313,7 +317,10 @@ void handleSerialRaw(char* aBuf){
 			rssi >>= 8;
 		}
 	}
-	client.print(aBuf);
+//	client.print(aBuf);
+	for (int i=0; i<numBytes; i++){
+		client.write(aBuf[i]);
+	}
 }
 
 void waitOnRMB(char* aBuf) {
