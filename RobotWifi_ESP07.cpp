@@ -32,7 +32,7 @@ RobotWifi-ESP07  --  runs on ESP8266 and handles WiFi communications for my robo
 #include "RobotWifi_ESP07.h"
 
 
-//#define DEBUG_OUT Serial
+#define DEBUG_OUT Serial
 
 #ifdef DEBUG_OUT
 #define DEBUG(x) DEBUG_OUT.println(x)
@@ -214,7 +214,7 @@ void scanNetworks(){
 
 void handleClient(char* aBuf){
 	//   'E' denotes commands for the ESP8266
-	if(!strcmp(aBuf, "LGO")){
+	if(!strcmp(aBuf, "<LGO>")){
 		rmbActive = true;
 	}
 	else if(aBuf[1] == 'E'){
@@ -255,6 +255,7 @@ void handleClient(char* aBuf){
 		//  Everything else goes to Main Brain
 		Serial.print(aBuf);
 	}
+	connectedToBase = true;
 	lastCommandTime = millis();
 	if(blackoutReported){
 		blackoutReported = false;
@@ -289,6 +290,9 @@ void handleSerial(char* aBuf) {
 		switch (aBuf[2]) {
 		case 'H':
 			Serial.print("<^_^>");
+			break;
+		case 'd':
+			connectedToBase = true;  // Backdoor when hooked to computer
 			break;
 		default:
 			break;
