@@ -112,6 +112,9 @@ void setup() {
 
 	bootState = WAITING_ON_RMB;
 
+	serialParser.setRawCallback(handleSerialRaw);
+	clientParser.setRawCallback(handleClientRaw);
+
 }
 
 void loop() {
