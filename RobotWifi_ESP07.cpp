@@ -32,7 +32,7 @@ RobotWifi-ESP07  --  runs on ESP8266 and handles WiFi communications for my robo
 #include "RobotWifi_ESP07.h"
 
 
-#define DEBUG_OUT Serial
+//#define DEBUG_OUT Serial
 
 #ifdef DEBUG_OUT
 #define DEBUG(x) DEBUG_OUT.println(x)
@@ -193,11 +193,6 @@ void heartbeat() {
 		heartState = !heartState;
 		digitalWrite(heartbeatPin, heartState);
 		lastMil = curMil;
-//		if (client.connected()) {
-//				client.print("<E-HB");
-//				client.print(WiFi.RSSI());
-//				client.print(">");
-//			}
 	}
 }
 
@@ -320,7 +315,6 @@ void handleSerialRaw(char* aBuf){
 			rssi >>= 8;
 		}
 	}
-//	client.print(aBuf);
 	for (int i=0; i<numBytes; i++){
 		client.write(aBuf[i]);
 	}
