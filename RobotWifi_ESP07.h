@@ -18,11 +18,16 @@ RobotWifi-ESP07  --  runs on ESP8266 and handles WiFi communications for my robo
 
      */
 
-#ifndef _RobotWifi_ESP07_H_
-#define _RobotWifi_ESP07_H_
+#ifndef _ROBOTWIFI_ESP07_H_
+#define _ROBOTWIFI_ESP07_H_
 #include "Arduino.h"
 // includes file not in repository with ssid and pwd
 #include "secDefine1.h"
+
+#include <SPI.h>
+
+#include <RadioCommon.h>
+#include <RH_RF95.h>
 
 #include <RobotSharedDefines.h>
 
@@ -33,7 +38,37 @@ RobotWifi-ESP07  --  runs on ESP8266 and handles WiFi communications for my robo
 #include "githash.h"
 
 
-void setupWifi();
+
+/*
+ *
+ *       ESP-07
+ *
+ *                                   +---------\/--------+
+ *                                   |             GPIO01|22  TX
+ *                                  2| A0          GPIO03|21  RX
+ *                                   |             GPIO05|20  RF95 - EN
+ *                                  4| GPIO16      GPIO04|19  RF95 - G0
+ *                             SCK  5| GPIO14     GPIO00 |18  RF95 - RST
+ *                            MISO  6| GPIO12     GPIO02 |17  ONBOARD_LED
+ *                            MOSI  7| GPIO13     GPIO15 |16  RF95 - CS
+ *                            VCC -- |                   | -- GND
+ *                                   +-------------------+
+ *
+ *
+ *
+ *
+ *
+ */
+
+#define RFM95_EN 5
+#define RFM95_CS 15
+#define RFM95_RST 0
+#define RFM95_INT 4
+
+void startWifi();
+void startRadio();
+
+void setupWifiConnection();
 void setup();
 void loop();
 void heartbeat();
@@ -47,11 +82,16 @@ void beTheAP();
 
 void killConnection();
 
+void clearBlackout();
+
 void handleClient(char*);
 void handleClientRaw(char*);
 void handleSerial(char*);
 void handleSerialRaw(char*);
 void waitOnRMB(char*);
 
+void handleRadioCommand(char*);
+void handleRawRadio(uint8_t*);
 
-#endif /* _RobotWifi_ESP07_H_ */
+
+#endif /* _ROBOTWIFI_ESP07_H_ */

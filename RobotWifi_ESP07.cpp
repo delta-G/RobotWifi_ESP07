@@ -41,7 +41,9 @@ RobotWifi-ESP07  --  runs on ESP8266 and handles WiFi communications for my robo
 #endif
 
 
-enum States {BOOTUP, WAITING_ON_RMB, WAITING_ON_BASE, RUNNING} bootState;
+enum States {BOOTUP, WAITING_ON_RMB, WAITING_ON_BASE, RUNNING_WIFI, RUNNING_RADIO} bootState;
+
+RH_RF95 radio(RFM95_CS, RFM95_INT);
 
 const uint8_t heartbeatPin = 2;
 uint16_t heartbeatDelay = 2000;
@@ -81,6 +83,11 @@ StreamParser clientParser(&client, START_OF_PACKET, END_OF_PACKET, handleClient)
 
 void setup() {
 
+
+	initRadio(RFM95_RST);
+	pinMode(RFM95_EN, OUTPUT);
+	digitalWrite(RFM95_EN, LOW);
+
 	pinMode(heartbeatPin, OUTPUT);
 	digitalWrite(heartbeatPin, HIGH);
 	delay(500);
@@ -98,7 +105,7 @@ void setup() {
 
 	DEBUG("Beginning");
 
-	setupWifi();
+	setupWifiConnection();
 	DEBUG("Back from scan and setup");
 
 	WiFiConnected = true;
@@ -120,6 +127,7 @@ void setup() {
 void loop() {
 
 	heartbeat();
+	serialParser.run();
 
 	switch (bootState) {
 
@@ -139,11 +147,12 @@ void loop() {
 		if (connectedToBase) {
 			Serial.print(COM_CONNECT_STRING);
 			heartbeatDelay = 2000;
-			bootState = RUNNING;
+			bootState = RUNNING_WIFI;
 			lastConnected = true;
 		}
+		clientParser.run();
 		break;
-	case RUNNING: {
+	case RUNNING_WIFI: {
 		if (!client.connected()) {
 			if (lastConnected == true) {
 				Serial.print("<LOST_COM>");
@@ -168,6 +177,14 @@ void loop() {
 				}
 			}
 		}
+		clientParser.run();
+		break;
+	}
+	case RUNNING_RADIO: {
+
+		listenToRadio();
+		handleOutput();
+
 		break;
 	}
 	default: {
@@ -178,9 +195,11 @@ void loop() {
 
 	}
 
-	serialParser.run();
-	clientParser.run();
+}
 
+void clearBlackout(){
+	blackoutReported = false;
+	heartbeatDelay = 2000;
 }
 
 void heartbeat() {
@@ -196,6 +215,22 @@ void heartbeat() {
 	}
 }
 
+void startWifi(){
+	if(bootState == RUNNING_RADIO){
+		// kill radio first
+		bootState = RUNNING_WIFI;
+	}
+	setupWifiConnection();
+
+}
+
+void startRadio(){
+	if(bootState == RUNNING_WIFI){
+		// kill wifi first
+		bootState = RUNNING_RADIO;
+	}
+	// code to start the radio
+}
 
 void scanNetworks(){
 
@@ -213,11 +248,27 @@ void scanNetworks(){
 
 }
 
+void handleRadioCommand(char* aBuf){
+	handleClient(aBuf);
+}
 
 void handleClient(char* aBuf){
 	//   'E' denotes commands for the ESP8266
 	if(!strcmp(aBuf, "<LGO>")){
 		rmbActive = true;
+	} else if(aBuf[1] == 'l'){
+		if(bootState == RUNNING_RADIO){
+			delay(250);
+			handleConfigString(aBuf);
+			delay(500);
+		}
+	} else if (aBuf[1] == 'P') {
+		if (bootState == RUNNING_RADIO) {
+			int rvl = atoi((const char*) (aBuf + 2));
+			char resp[10];
+			snprintf(resp, 10, "<p%i>", rvl);
+			sendToRadio(resp);
+		}
 	}
 	else if(aBuf[1] == 'E'){
 		switch(aBuf[2]){
@@ -260,8 +311,7 @@ void handleClient(char* aBuf){
 	connectedToBase = true;
 	lastCommandTime = millis();
 	if(blackoutReported){
-		blackoutReported = false;
-		heartbeatDelay = 2000;
+		clearBlackout();
 	}
 }
 
@@ -278,15 +328,27 @@ void handleClientRaw(char* aBuf){
 	}
 	lastCommandTime = millis();
 	if(blackoutReported){
-		blackoutReported = false;
-		heartbeatDelay = 2000;
+		clearBlackout();
 	}
 }
 
+void handleRawRadio(uint8_t *p) {
+	handleClientRaw((char*)p);
+}
 
 void handleSerial(char* aBuf) {
 	if (!strcmp(aBuf, "<FFF>")){
 		DEBUG("Flush Command");
+		if(bootState == RUNNING_RADIO){
+			flush();
+			return;
+		}
+	} else if (aBuf[1] == 'l') {
+		if (bootState == RUNNING_RADIO) {
+			addToHolding(aBuf);
+			flush();
+			handleConfigString(aBuf);
+		}
 	}
 	else if (aBuf[1] == 'E') {
 		switch (aBuf[2]) {
@@ -300,25 +362,50 @@ void handleSerial(char* aBuf) {
 			break;
 		}
 	} else {
-		client.print(aBuf);
-	}
-}
-
-
-void handleSerialRaw(char* aBuf){
-	uint8_t numBytes = aBuf[2];
-
-	if (aBuf[1] == 0x13 && numBytes == ROBOT_DATA_DUMP_SIZE) {
-		int32_t rssi = WiFi.RSSI();
-		for(int i = 2; i <= 5; i++){
-			aBuf[ROBOT_DATA_DUMP_SIZE - i] = rssi & 0xFF;
-			rssi >>= 8;
+		if (bootState == RUNNING_WIFI) {
+			client.print(aBuf);
+		} else if (bootState == RUNNING_RADIO) {
+			if (connectedToBase) {
+				addToHolding ((char*)aBuf);
+			}
 		}
 	}
-	for (int i=0; i<numBytes; i++){
-		client.write(aBuf[i]);
+}
+
+
+void handleSerialRaw(char *aBuf) {
+	uint8_t numBytes = aBuf[2];
+
+	if (bootState == RUNNING_WIFI) {
+
+		if (aBuf[1] == 0x13 && numBytes == ROBOT_DATA_DUMP_SIZE) {
+			int32_t rssi = WiFi.RSSI();
+			for (int i = 2; i <= 5; i++) {
+				aBuf[ROBOT_DATA_DUMP_SIZE - i] = rssi & 0xFF;
+				rssi >>= 8;
+			}
+		}
+		for (int i = 0; i < numBytes; i++) {
+			client.write(aBuf[i]);
+		}
+	} else if (bootState == RUNNING_RADIO) {
+
+		if (aBuf[1] == 0x13 && numBytes == ROBOT_DATA_DUMP_SIZE) {
+			uint8_t snr = (uint8_t) (radio.lastSNR());
+			int rs = radio.lastRssi();
+			uint8_t rssi = (uint8_t) (abs(rs));
+			aBuf[ROBOT_DATA_DUMP_SIZE - 5] = snr;
+			aBuf[ROBOT_DATA_DUMP_SIZE - 4] = rssi;
+		}
+
+		addToHolding((uint8_t*) aBuf, numBytes);
+
+		flush();
+
 	}
 }
+
+
 
 void waitOnRMB(char* aBuf) {
 	if (strcmp(aBuf, RMB_STARTUP_STRING) == 0){
@@ -335,7 +422,7 @@ void waitOnRMB(char* aBuf) {
  *
  */
 
-void setupWifi() {
+void setupWifiConnection() {
 	DEBUG("scanAndSetup");
 	connectToHome();
 }
