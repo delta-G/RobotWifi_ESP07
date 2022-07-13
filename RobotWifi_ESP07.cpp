@@ -96,6 +96,8 @@ void setup() {
 	WiFi.forceSleepBegin();
 	delay(1);
 
+	initRadio(RFM95_RST);  // Just sets up the reset pin and variables
+
 	pinMode(radioSelectDIP, INPUT);
 
 	pinMode(heartbeatPin, OUTPUT);
@@ -109,19 +111,24 @@ void setup() {
 	delay(250);
 	digitalWrite(heartbeatPin, HIGH);
 
+	bootState = BOOTUP;
 
 	Serial.begin(ROBOT_COM_BAUD);
 	delay(500);
 
 	radioMode = (digitalRead(radioSelectDIP) == HIGH)?false:true;
 	DEBUG("Beginning");
-	if(radioMode){
-		startRadio();
-	} else {
-		startWifi();
-	}
-
-	DEBUG("Back from scan and setup");
+//	if(radioMode){
+//		stopWifi();
+//		delay(10);
+//		startRadio();
+//	} else {
+//		stopRadio();
+//		delay(10);
+//		startWifi();
+//	}
+//
+//	DEBUG("Back from scan and setup");
 
 	heartbeatDelay = 500;
 
@@ -146,8 +153,10 @@ void loop() {
 			serialParser.setCallback(handleSerial);
 			Serial.print(COM_START_STRING);
 			if(radioMode){
+				startRadio();
 				bootState = WAITING_ON_BASE_RADIO;
 			} else {
+				startWifi();
 				bootState = WAITING_ON_BASE_WIFI;
 			}
 			DEBUG(".");
@@ -288,8 +297,7 @@ void startRadio(){
 	}
 	// code to start the radio
 	digitalWrite(RFM95_EN, HIGH); // enable pin HIGH to power radio
-	initRadio(RFM95_RST);
-
+	delay(1);
 	resetRadio();
 	delay(1);
 }
