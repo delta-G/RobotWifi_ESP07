@@ -66,7 +66,9 @@ RobotWifi-ESP07  --  runs on ESP8266 and handles WiFi communications for my robo
 #define RFM95_INT 4
 
 void startWifi();
+void stopWifi();
 void startRadio();
+void stopRadio();
 
 void setupWifiConnection();
 void setup();
@@ -80,7 +82,7 @@ void connectToHomeExt();
 void connectToBase();
 void beTheAP();
 
-void killConnection();
+void resetConnection();
 
 void clearBlackout();
 
@@ -92,6 +94,8 @@ void waitOnRMB(char*);
 
 void handleRadioCommand(char*);
 void handleRawRadio(uint8_t*);
+
+void sendToBase(char*);
 
 
 #endif /* _ROBOTWIFI_ESP07_H_ */

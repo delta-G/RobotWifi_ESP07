@@ -248,11 +248,14 @@ void heartbeat() {
 }
 
 void startWifi(){
-	if((bootState == RUNNING_RADIO) || (bootState == WAITING_ON_BASE_RADIO)){
+	if ((bootState == RUNNING_RADIO) || (bootState == WAITING_ON_BASE_RADIO)) {
 		// kill radio first
-		digitalWrite(RFM95_EN, LOW);
-		delay(1);
-		bootState = RUNNING_WIFI;
+		stopRadio();
+		if (bootState == WAITING_ON_BASE_RADIO) {
+			bootState = WAITING_ON_BASE_WIFI;
+		} else {
+			bootState = RUNNING_WIFI;
+		}
 	}
 
 	WiFi.forceSleepWake();
@@ -262,26 +265,38 @@ void startWifi(){
 	WiFiConnected = true;
 
 	server.begin();
+}
 
+void stopWifi() {
+	WiFi.disconnect(true);
+	delay(1);
+	WiFi.mode(WIFI_OFF);
+	WiFi.forceSleepBegin();
+	delay(1);
+	WiFiConnected = false;
 }
 
 void startRadio(){
 	if((bootState == RUNNING_WIFI) || (bootState == WAITING_ON_BASE_WIFI)){
 		// kill wifi first
-		WiFi.disconnect(true);
-		delay(1);
-		WiFi.mode(WIFI_OFF);
-		WiFi.forceSleepBegin();
-		delay(1);
-		WiFiConnected = false;
-		bootState = RUNNING_RADIO;
+		stopWifi();
+		if(bootState == WAITING_ON_BASE_WIFI){
+			bootState = WAITING_ON_BASE_RADIO;
+		} else {
+			bootState = RUNNING_RADIO;
+		}
 	}
 	// code to start the radio
 	digitalWrite(RFM95_EN, HIGH); // enable pin HIGH to power radio
 	initRadio(RFM95_RST);
 
 	resetRadio();
+	delay(1);
+}
 
+void stopRadio() {
+	digitalWrite(RFM95_EN, LOW);
+	delay(1);
 }
 
 void scanNetworks(){
@@ -295,9 +310,18 @@ void scanNetworks(){
 		WiFi.SSID(i).toCharArray(sbuf, len);
 
 		sprintf(buf, "<%s,%d>",sbuf , WiFi.RSSI(i));
-		client.print(buf);
+//		client.print(buf);
+		sendToBase(buf);
 	}
 
+}
+
+void sendToBase(char* aBuf){
+	if((bootState == RUNNING_RADIO) || (bootState == WAITING_ON_BASE_RADIO)){
+		addToHolding(aBuf);
+	} else if((bootState == RUNNING_WIFI) || (bootState == WAITING_ON_BASE_WIFI)){
+		client.print(aBuf);
+	}
 }
 
 void handleRadioCommand(char* aBuf){
@@ -329,31 +353,55 @@ void handleClient(char* aBuf){
 			int rvl = atoi((const char*) (aBuf + 3));
 			char resp[10];
 			snprintf(resp, 10, "<p%i>", rvl);
-			client.print(resp);
+//			client.print(resp);
+			sendToBase(resp);
 			break;
 		}
 		case 'G':
 		{
-			String notif = String("<E GitHash - ") + GIT_HASH + ">";
-			client.print(notif);
+			char gitbuf[9] = {0};
+			strncpy(gitbuf, GIT_HASH, 8);
+			gitbuf[8] = 0;
+			char nbuf[20] = {0};
+			sprintf(nbuf, "<EGit-%s>", gitbuf);
+
+//			String notif = String("<E GitHash - ") + GIT_HASH + ">";
+//			client.print(notif);
+			sendToBase(nbuf);
 			break;
 		}
 		case 'W':
 			scanNetworks();
 			break;
-		case 'C':
-		{
-			String notif = "<E  NewClient @ " + WiFi.SSID() + "," + WiFi.RSSI() + ">";
-			client.print(notif);
+		case 'C': {
+			if ((bootState == RUNNING_WIFI)	|| (bootState == WAITING_ON_BASE_WIFI)) {
+				String notif = "<E  NewClient @ " + WiFi.SSID() + "," + WiFi.RSSI() + ">";
+				client.print(notif);
+			} else {
+				sendToBase("<NotOnWifi>");
+			}
 			break;
 		}
+		case 'R':
+			if(aBuf[3]=='r'){
+//				stopWifi();  // startRadio does this right now but shouldn't.
+				startRadio();
+			}
+			else if(aBuf[3]=='w'){
+//				stopRadio(); // startWiFi does this right now but shouldn't.
+				flush();
+				delay(10);
+				startWifi();
+			}
+			break;
 		case 'X':
 			// Disconnect, scan and reconnect
-			killConnection();
+			resetConnection();
 			break;
 
 		default:
-			client.print("<Bad ESP>");
+//			client.print("<Bad ESP>");
+			sendToBase("<Bad ESP>");
 		}
 	}
 	else if(rmbActive){
@@ -553,11 +601,15 @@ void connectToHomeExt() {
 	}
 }
 
-void killConnection() {
-	client.stop();
-	WiFi.disconnect();
-	delay(5000);
-//	startWifi();
-//	server.begin();
+void resetConnection() {
+	if ((bootState == RUNNING_WIFI) || (bootState == WAITING_ON_BASE_WIFI)) {
+		client.stop();
+		WiFi.disconnect();
+		delay(5000);
+		startWifi();
+	}
+	else if ((bootState == RUNNING_RADIO) || (bootState == WAITING_ON_BASE_RADIO)) {
+		resetRadio();
+	}
 }
 
