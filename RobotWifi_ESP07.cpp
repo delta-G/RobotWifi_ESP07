@@ -56,6 +56,7 @@ uint32_t lastCommandTime;
 uint32_t commandTimeout = 20000;
 boolean blackoutReported = false;
 
+boolean radioMode = false;  // false is WiFi - true is LoRa Radio
 
 boolean rmbActive = false;
 boolean WiFiConnected = false;
@@ -112,9 +113,14 @@ void setup() {
 	Serial.begin(ROBOT_COM_BAUD);
 	delay(500);
 
+	radioMode = (digitalRead(radioSelectDIP) == HIGH)?false:true;
 	DEBUG("Beginning");
+	if(radioMode){
+		startRadio();
+	} else {
+		startWifi();
+	}
 
-	startWifi();
 	DEBUG("Back from scan and setup");
 
 	heartbeatDelay = 500;
@@ -139,11 +145,10 @@ void loop() {
 		if(rmbActive){   // gets set by Serial parser
 			serialParser.setCallback(handleSerial);
 			Serial.print(COM_START_STRING);
-			int dipRead = digitalRead(radioSelectDIP);
-			if(dipRead == HIGH){
-				bootState = WAITING_ON_BASE_WIFI;
-			} else {
+			if(radioMode){
 				bootState = WAITING_ON_BASE_RADIO;
+			} else {
+				bootState = WAITING_ON_BASE_WIFI;
 			}
 			DEBUG(".");
 		}
