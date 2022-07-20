@@ -47,7 +47,7 @@ RobotWifi-ESP07  --  runs on ESP8266 and handles WiFi communications for my robo
  *                                   |             GPIO01|22  TX
  *                                  2| A0          GPIO03|21  RX
  *                                   |             GPIO05|20  RF95 - EN
- *                                  4| GPIO16      GPIO04|19  RF95 - G0
+ *                      DIP Switch  4| GPIO16      GPIO04|19  RF95 - G0
  *                             SCK  5| GPIO14     GPIO00 |18  RF95 - RST
  *                            MISO  6| GPIO12     GPIO02 |17  ONBOARD_LED
  *                            MOSI  7| GPIO13     GPIO15 |16  RF95 - CS
