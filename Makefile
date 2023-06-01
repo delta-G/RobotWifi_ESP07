@@ -20,6 +20,10 @@
 #
 #ARDUINO_PORT = /dev/ttyUSB0  # change this to the port used by your board
 
+
+$(shell ./preCompile.sh > /dev/null)
+
+
 SKETCH = /home/david/robot/RobotWifi_ESP07/RobotWifi_ESP07.cpp
 
 CHIP = esp8266
