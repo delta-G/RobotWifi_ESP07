@@ -45,7 +45,7 @@ enum States {BOOTUP, WAITING_ON_RMB, WAITING_ON_BASE_WIFI, WAITING_ON_BASE_RADIO
 
 RH_RF95 radio(RFM95_CS, RFM95_INT);
 
-const uint8_t radioSelectDIP = 16;
+const uint8_t mbResetPin = 16;
 
 const uint8_t heartbeatPin = 2;
 uint16_t heartbeatDelay = 2000;
@@ -88,6 +88,8 @@ StreamParser clientParser(&client, START_OF_PACKET, END_OF_PACKET, handleClient)
 
 void setup() {
 
+	pinMode(mbResetPin, OUTPUT);
+	digitalWrite(mbResetPin, HIGH);
 
 	// RFM95_EN pin LOW to kill power to it
 	pinMode(RFM95_EN, OUTPUT);
@@ -98,9 +100,11 @@ void setup() {
 	WiFi.forceSleepBegin();
 	delay(1);
 
+	ArduinoOTA.setPort(8266);
+
 	initRadio(RFM95_RST);  // Just sets up the reset pin and variables
 
-	pinMode(radioSelectDIP, INPUT);
+
 
 	pinMode(heartbeatPin, OUTPUT);
 	digitalWrite(heartbeatPin, HIGH);
@@ -118,7 +122,6 @@ void setup() {
 	Serial.begin(ROBOT_COM_BAUD);
 	delay(500);
 
-	radioMode = (digitalRead(radioSelectDIP) == HIGH)?false:true;
 	DEBUG("Beginning");
 //	if(radioMode){
 //		stopWifi();
@@ -141,9 +144,44 @@ void setup() {
 	serialParser.setRawCallback(handleSerialRaw);
 	clientParser.setRawCallback(handleClientRaw);
 
+	ArduinoOTA.onStart([]() {
+	//	  Serial.println("Starting OTA");
+	    String type;
+	    if (ArduinoOTA.getCommand() == U_FLASH) {
+	      type = "sketch";
+	    } else {  // U_FS
+	      type = "filesystem";
+	    }
+
+	    // NOTE: if updating FS this would be the place to unmount FS using FS.end()
+	//    Serial.println("Start updating " + type);
+	  });
+	  ArduinoOTA.onEnd([]() {
+	//    Serial.println("\nEnd");
+	  });
+	  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+	//    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+	  });
+	  ArduinoOTA.onError([](ota_error_t error) {
+	//    Serial.printf("Error[%u]: ", error);
+	    if (error == OTA_AUTH_ERROR) {
+	//      Serial.println("Auth Failed");
+	    } else if (error == OTA_BEGIN_ERROR) {
+	//      Serial.println("Begin Failed");
+	    } else if (error == OTA_CONNECT_ERROR) {
+	//      Serial.println("Connect Failed");
+	    } else if (error == OTA_RECEIVE_ERROR) {
+	//      Serial.println("Receive Failed");
+	    } else if (error == OTA_END_ERROR) {
+	//      Serial.println("End Failed");
+	    }
+	  });
+	  ArduinoOTA.begin();
+
 }
 
 void loop() {
+	ArduinoOTA.handle();
 
 	heartbeat();
 	serialParser.run();
