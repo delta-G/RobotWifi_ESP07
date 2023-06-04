@@ -158,6 +158,7 @@ void setup() {
 	  });
 	  ArduinoOTA.onEnd([]() {
 	//    Serial.println("\nEnd");
+//		  ESP.restart();
 	  });
 	  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
 	//    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
@@ -181,7 +182,8 @@ void setup() {
 }
 
 void loop() {
-	ArduinoOTA.handle();
+//	Moved OTA handle inside the state machine to the RUNNING_WIFI state
+//	ArduinoOTA.handle();
 
 	heartbeat();
 	serialParser.run();
@@ -234,6 +236,7 @@ void loop() {
 			heartbeatDelay = 200;
 			lastConnected = false;
 		} else {
+			ArduinoOTA.handle();
 			if (lastConnected == false) {
 				// if we just now regained connection
 				String notif = "<E  NewClient @ " + WiFi.SSID() + ","
