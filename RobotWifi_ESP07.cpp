@@ -405,6 +405,14 @@ void handleClient(char* aBuf){
 			flashMainBrain();
 			break;
 		}
+		// Reset Main Brain
+		case 'M':
+		{
+			resetMainBrain();
+			bootState = WAITING_ON_RMB;
+			rmbActive = false;
+			break;
+		}
 		// Ping  Send <EP###> Where ### is any integer and will respond with <p###>
 		case 'P':
 		{
@@ -502,6 +510,8 @@ void handleSerial(char* aBuf) {
 			flush();
 			return;
 		}
+	} else if (strcmp(aBuf, RMB_STARTUP_STRING) == 0){
+		rmbActive = true;
 	} else if (aBuf[1] == 'l') {
 		if ((bootState == RUNNING_RADIO) || (bootState == WAITING_ON_BASE_RADIO)) {
 			addToHolding(aBuf);
