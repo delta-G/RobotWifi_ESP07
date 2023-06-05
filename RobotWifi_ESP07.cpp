@@ -84,12 +84,11 @@ StreamParser clientParser(&client, START_OF_PACKET, END_OF_PACKET, handleClient)
  *
  **********************************************************/
 
-
-
 void setup() {
 
-	pinMode(mbResetPin, OUTPUT);
+
 	digitalWrite(mbResetPin, HIGH);
+	pinMode(mbResetPin, OUTPUT);
 
 	// RFM95_EN pin LOW to kill power to it
 	pinMode(RFM95_EN, OUTPUT);
@@ -116,6 +115,7 @@ void setup() {
 	digitalWrite(heartbeatPin, LOW);
 	delay(250);
 	digitalWrite(heartbeatPin, HIGH);
+
 
 	bootState = BOOTUP;
 
@@ -183,7 +183,7 @@ void setup() {
 
 void loop() {
 //	Moved OTA handle inside the state machine to the RUNNING_WIFI state
-//	ArduinoOTA.handle();
+	ArduinoOTA.handle();
 
 	heartbeat();
 	serialParser.run();
@@ -236,7 +236,7 @@ void loop() {
 			heartbeatDelay = 200;
 			lastConnected = false;
 		} else {
-			ArduinoOTA.handle();
+//			ArduinoOTA.handle();
 			if (lastConnected == false) {
 				// if we just now regained connection
 				String notif = "<E  NewClient @ " + WiFi.SSID() + ","
@@ -399,6 +399,13 @@ void handleClient(char* aBuf){
 	}
 	else if(aBuf[1] == 'E'){
 		switch(aBuf[2]){
+		// Flash MainBrain
+		case 'F':
+		{
+			flashMainBrain();
+			break;
+		}
+		// Ping  Send <EP###> Where ### is any integer and will respond with <p###>
 		case 'P':
 		{
 			int rvl = atoi((const char*) (aBuf + 3));
@@ -408,6 +415,7 @@ void handleClient(char* aBuf){
 			sendToBase(resp);
 			break;
 		}
+		// Get the Git Hash
 		case 'G':
 		{
 			char gitbuf[9] = {0};
@@ -565,6 +573,36 @@ void waitOnRMB(char* aBuf) {
 }
 
 
+void resetMainBrain() {
+	digitalWrite(mbResetPin, LOW);
+	delay(10);
+	digitalWrite(mbResetPin, HIGH);
+}
+
+//  This function will block until all code is loaded to MainBrain.
+//  TODO:  Think about how to shut other things down gracefully before we do this.
+void flashMainBrain() {
+	boolean exitFlag = false;
+	unsigned long lastRead = millis();
+	resetMainBrain();
+	while (!exitFlag) {
+		while (client.available()) {
+			Serial.write(client.read());
+			lastRead = millis();
+		}
+		while (Serial.available()){
+			client.write(Serial.read());
+		}
+		///Wait for some time after all the action stops and then reset MainBrain again.
+		if (millis() - lastRead >= 5000) {
+			resetMainBrain();
+			// TODO:  Need code here to listen to MB come back alive and get things into order.
+			exitFlag = true;
+		}
+	}
+}
+
+
 ////   **TODO:
 /*
  * This code should build an array or linked list or something of all the SSID that it finds.
@@ -620,6 +658,7 @@ void connectToHome() {
 		delay(50);
 		heartbeat();
 	}
+	heartbeatDelay = 333;
 }
 
 

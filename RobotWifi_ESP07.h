@@ -75,6 +75,9 @@ void setup();
 void loop();
 void heartbeat();
 
+void resetMainBrain();
+void flashMainBrain();
+
 void scanNetworks();
 
 void connectToHome();
