@@ -402,7 +402,10 @@ void handleClient(char* aBuf){
 		// Flash MainBrain
 		case 'F':
 		{
-			flashMainBrain();
+			///  Only allowed to flash in WiFi mode if MainBrain is active
+			if (bootState == RUNNING_WIFI) {
+				flashMainBrain();
+			}
 			break;
 		}
 		// Reset Main Brain
@@ -587,6 +590,7 @@ void resetMainBrain() {
 	digitalWrite(mbResetPin, LOW);
 	delay(10);
 	digitalWrite(mbResetPin, HIGH);
+	bootState = WAITING_ON_RMB;  //  This will let us come back to life gracefully
 }
 
 //  This function will block until all code is loaded to MainBrain.
@@ -606,7 +610,6 @@ void flashMainBrain() {
 		///Wait for some time after all the action stops and then reset MainBrain again.
 		if (millis() - lastRead >= 5000) {
 			resetMainBrain();
-			// TODO:  Need code here to listen to MB come back alive and get things into order.
 			exitFlag = true;
 		}
 	}
